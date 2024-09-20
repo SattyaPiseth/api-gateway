@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  keycloak-postgresql:
+    container_name: keycloak-postgresql
+    image: postgres:14
+    volumes:
+      - postgresql_keycloak_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=keycloak_user
+      - POSTGRES_PASSWORD=secure_db_password
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "keycloak_user"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:latest  # Consider specifying a version
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "8181:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=secure_password
+      - DB_VENDOR=POSTGRES
+      - DB_ADDR=keycloak-postgresql:5432  # Use service name
+      - DB_DATABASE=keycloak
+      - DB_USER=keycloak_user
+      - DB_PASSWORD=secure_db_password
+      - JAVA_OPTS=-Xms512m -Xmx1024m
+    volumes:
+      - keycloak_data:/opt/keycloak/data/import/
+    depends_on:
+      keycloak-postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/auth/"]  # Adjusted port
+      interval: 30s
+      timeout: 10s
+      retries: 5
+volumes:
+  postgresql_keycloak_data:
+  keycloak_data:

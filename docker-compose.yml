@@ -1,46 +1,57 @@
 version: '3.9'
 
 services:
-  keycloak-postgresql:
-    container_name: keycloak-postgresql
+  keycloak-db:
     image: postgres:14
-    volumes:
-      - postgresql_keycloak_data:/var/lib/postgresql/data
+    container_name: keycloak-db
     environment:
-      - POSTGRES_DB=keycloak
-      - POSTGRES_USER=keycloak_user
-      - POSTGRES_PASSWORD=secure_db_password
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak_user
+      POSTGRES_PASSWORD: secure_db_password
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "keycloak_user"]
       interval: 30s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - keycloak-network
 
   keycloak:
+    image: quay.io/keycloak/keycloak:21.0.1
     container_name: keycloak
-    image: quay.io/keycloak/keycloak:latest  # Consider specifying a version
-    command: ["start-dev", "--import-realm"]
+    command: ["start-dev"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: secure_password
+      DB_VENDOR: POSTGRES
+      DB_ADDR: keycloak-db:5432
+      DB_DATABASE: keycloak
+      DB_USER: keycloak_user
+      DB_PASSWORD: secure_db_password
+      JAVA_OPTS: -Xms512m -Xmx1024m
     ports:
       - "8181:8080"
-    environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=secure_password
-      - DB_VENDOR=POSTGRES
-      - DB_ADDR=keycloak-postgresql:5432  # Use service name
-      - DB_DATABASE=keycloak
-      - DB_USER=keycloak_user
-      - DB_PASSWORD=secure_db_password
-      - JAVA_OPTS=-Xms512m -Xmx1024m
     volumes:
-      - keycloak_data:/opt/keycloak/data/import/
+      - keycloak_data:/opt/keycloak/data
     depends_on:
-      keycloak-postgresql:
+      keycloak-db:
         condition: service_healthy
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/auth/"]  # Adjusted port
+      test: ["CMD", "curl", "-f", "http://localhost:8181/auth/"]
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - keycloak-network
+
 volumes:
-  postgresql_keycloak_data:
+  keycloak_db_data:
   keycloak_data:
+
+networks:
+  keycloak-network:
+    driver: bridge

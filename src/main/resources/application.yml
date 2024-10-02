@@ -8,3 +8,100 @@ spring:
           issuer-uri: http://localhost:8181/realms/spring-microservice-security-realm
 server:
   port: 9000
+springdoc:
+  swagger-ui:
+    path: /docs
+    urls[0]:
+      name: Product Service
+      url: /aggregate/product-service/v3/api-docs
+    urls[1]:
+      name: Order Service
+      url: /aggregate/order-service/v3/api-docs
+    urls[2]:
+      name: Inventory Service
+      url: /aggregate/inventory-service/v3/api-docs
+  api-docs:
+    path: /api-docs
+
+# Actuator Endpoints
+management:
+  health:
+    circuitbreakers:
+      # Enables the health check for circuit breakers.
+      # This exposes the status of the circuit breakers via the health endpoint.
+      enabled: true
+
+  endpoints:
+    web:
+      exposure:
+        # Exposes all Actuator endpoints, including custom endpoints like circuit breakers.
+        # You can replace the '*' with specific endpoints if you want to expose only a subset (e.g., 'health', 'metrics').
+        include: '*'
+
+  endpoint:
+    health:
+      # Always shows the details of the health checks in the response.
+      # This means the health endpoint will include full status information, not just UP or DOWN.
+      # Useful for monitoring systems but be cautious in production to avoid exposing sensitive details.
+      show-details: always
+
+
+# Resilience4j Configuration for Circuit Breakers
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        # Register a health indicator for the circuit breaker.
+        # This allows the circuit breaker's status to be exposed via Spring Boot's Actuator endpoints.
+        register-health-indicator: true
+
+        # Define the type of sliding window to use for calculating failure rates.
+        # 'count_based' means the window size is determined by the number of calls.
+        sliding-window-type: count_based
+
+        # Set the size of the sliding window.
+        # With 'count_based' sliding window type, the last 10 calls are considered for failure rate calculation.
+        sliding-window-size: 10
+
+        # Define the failure rate threshold (in percentage) at which the circuit breaker will open.
+        # If 50% or more of the calls in the sliding window fail, the circuit breaker transitions to the open state.
+        failure-rate-threshold: 50
+
+        # Specify the duration the circuit breaker should stay open before transitioning to half-open.
+        # Here, it waits for 5 seconds in the open state.
+        wait-duration-in-open-state:
+          seconds: 5
+
+        # Set the number of permitted calls when the circuit breaker is in the half-open state.
+        # After the wait duration, the circuit breaker allows 3 test calls to check if the external service has recovered.
+        permitted-number-of-calls-in-half-open-state: 3
+
+        # Enable automatic transition from the open state to the half-open state after the wait duration elapses.
+        # When set to true, the circuit breaker will automatically attempt to transition without manual intervention.
+        automatic-transition-from-open-to-half-open-enabled: true
+
+        # Specify the minimum number of calls required before the circuit breaker starts evaluating the failure rate.
+        # Helps prevent the circuit breaker from opening due to insufficient data.
+        minimum-number-of-calls: 5
+
+
+# Resilience4j Timeout Properties
+  timelimiter:
+    configs:
+      default:
+        # Sets the default timeout duration for the time limiter.
+        # The timeout is set to 3 seconds, meaning that any operation wrapped by this time limiter
+        # will be interrupted if it takes more than 3 seconds to complete.
+        timeout-duration:
+          seconds: 3
+
+# Resilience4j Retry Properties
+  retry:
+    configs:
+      default:
+        # The maximum number of retry attempts before giving up
+        max-attempts: 3
+
+        # The duration to wait between retry attempts (2 seconds in this case)
+        wait-duration:
+          seconds: 2
